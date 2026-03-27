@@ -106,12 +106,65 @@ def decimal_to_hexadecimal(decimal_num, precision=4):
         
     return "-" + final_hex if is_negative else final_hex
 
+def run_tests():
+    """
+    Automated test suite to verify the logic for various inputs.
+    Updated to handle float/int comparison differences.
+    """
+    print("\n" + "="*50)
+    print("   Group GIT_GROUP_35: Automated Testing Suite   ")
+    print("="*50)
+
+    test_cases = [
+        (1, 255, "FF", "Integer Dec to Hex"),
+        (1, 26.9375, "1A.F", "Fractional Dec to Hex"),
+        (1, -10, "-A", "Negative Dec to Hex"),
+        (2, "FF", 255, "Integer Hex to Dec"),
+        (2, "1A.F", 26.9375, "Fractional Hex to Dec"),
+        (2, "-A", -10, "Negative Hex to Dec"),
+        (2, ".A", 0.625, "Point-start Hex to Dec"),
+        (2, "1.2.3", "Error", "Invalid Input (Multiple Dots)")
+    ]
+
+    passed_count = 0
+    for mode, inp, expected, name in test_cases:
+        if mode == 1:
+            actual = decimal_to_hexadecimal(inp)
+        else:
+            actual = hexadecimal_to_decimal(inp)
+        
+        # Convert both to string for comparison or handle numeric equality
+        is_match = False
+        if expected == "Error":
+            is_match = "Error" in str(actual)
+        else:
+            # Check numeric equality
+            try:
+                is_match = float(actual) == float(expected)
+            except:
+                is_match = str(actual) == str(expected)
+
+        if is_match:
+            status = "[V] PASS"
+            passed_count += 1
+        else:
+            status = f"[X] FAIL (Expected: {expected}, Got: {actual})"
+            
+        print(f"{name:<30} : {status}")
+
+    print("="*50)
+    print(f" FINAL SUMMARY: {passed_count}/{len(test_cases)} tests passed.")
+    print("="*50 + "\n")
+
 def main():
-    """Main interface for the base conversion calculator"""
+    """
+    Main execution loop providing a menu for the user.
+    """
     while True:
-        print("\n--- Group 35: Hex <-> Decimal Converter ---")
+        print("\n--- Group GIT_GROUP_35: Hex <-> Decimal Converter ---")
         print("1. Hexadecimal to Decimal")
         print("2. Decimal to Hexadecimal")
+        print("3. Run Automated System Tests")
         print("0. Exit")
         
         choice = input("\nSelect option: ").strip()
@@ -128,12 +181,16 @@ def main():
                 
             elif choice == '2':
                 dec_input = input("Enter Decimal: ")
-                # Convert input to float to handle both integers and decimals
-                num = float(dec_input)
+                num = float(dec_input) # Validate numeric input
                 result = decimal_to_hexadecimal(num)
                 print(f"Result (Hexadecimal): {result}")
+                
+            elif choice == '3':
+                # Trigger the testing suite
+                run_tests() 
+                
             else:
-                print("Invalid choice. Please select 0, 1, or 2.")
+                print("Invalid choice. Please select 0, 1, 2 or 3.")
         except ValueError:
             print("Error: Please enter a valid numerical value.")
 
