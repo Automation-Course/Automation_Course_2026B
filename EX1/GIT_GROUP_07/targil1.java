@@ -1,57 +1,50 @@
 import java.util.*;
+
 public class targil1 {
     static Scanner sc = new Scanner(System.in);
 
     public static void main(String[] args) {
-        String choice="";
-        while(true) {
+        String choice = "";
+        while (true) {
             System.out.println("Please choose one of the options below\n1. Convert Hexadecimal to Decimal \n2. Convert Decimal to Hexadecimal \n0. For exit ");
-            choice=sc.next();
-            switch(choice) {
-                case "1": //hexadecimal to decimal
-                    System.out.println("Please enter a hexadecimal number");
-                    sc.nextLine();
+            choice = sc.next();
+            switch (choice) {
+                case "1": // Hexadecimal to Decimal
+                    System.out.println("Please enter a hexadecimal number (0-9, A-F)");
+                    sc.nextLine(); // לניקוי ה-Buffer
                     String number1 = sc.nextLine().trim().toUpperCase();
 
-                    while (!number1.matches("[0-9A-F]+") || number1.length() > 15) {
-                        if (number1.length() > 15) {
-                            System.out.println("Invalid hexadecimal number (too long, max 15 characters). Try again:");
-                        } else if (number1.contains(" ")) {
-                            System.out.println("Invalid hexadecimal number (no spaces allowed). Try again:");
-                        } else {
-                            System.out.println("Invalid hexadecimal number. Try again:");
-                        }
+                    // בשיטת משלים ל-2, הקלט ההקסדצימלי לא מכיל מינוס. המקסימום הוא 16 תווים.
+                    while (!number1.matches("[0-9A-F]+") || number1.length() > 16) {
+                        System.out.println("Invalid hexadecimal number. Try again:");
                         number1 = sc.nextLine().trim().toUpperCase();
                     }
-                    System.out.println(hexadecimalToDecimal(number1));
+
+                    System.out.println("Result: " + hexadecimalToDecimal(number1));
                     continue;
 
-                case "2": //decimal to hexadecimal
+                case "2": // Decimal to Hexadecimal
                     System.out.println("Please enter a decimal number");
                     sc.nextLine();
-                    while(true) {
+                    while (true) {
                         String input = sc.nextLine().trim();
 
-                        if (input.contains(" ")) {
-                            System.out.println("Invalid decimal number (no spaces allowed). Try again:");
+                        if (input.isEmpty() || input.equals("-") || input.contains(" ")) {
+                            System.out.println("Invalid input. Try again:");
                             continue;
                         }
-                        // הוספנו בדיקת אורך כדי למנוע קריסה במספרים ענקיים
-                        if (input.length() > 18) {
-                            System.out.println("Invalid decimal number (too long, max 18 digits). Try again:");
+
+                        int maxDecLen = input.startsWith("-") ? 20 : 19;
+                        if (input.length() > maxDecLen) {
+                            System.out.println("Number too long for Long type. Try again:");
                             continue;
                         }
 
                         try {
-                            // שינינו ל-Long במקום Integer
                             long number2 = Long.parseLong(input);
-                            if (number2 < 0) {
-                                System.out.println("Invalid decimal number (positive only). Try again:");
-                                continue;
-                            }
-                            System.out.println(decimalToHexadecimal(number2));
+                            System.out.println("Result: " + decimalToHexadecimal(number2));
                             break;
-                        } catch (NumberFormatException e) { //valid check
+                        } catch (NumberFormatException e) {
                             System.out.println("Invalid decimal number. Try again:");
                         }
                     }
@@ -69,40 +62,39 @@ public class targil1 {
         }
     }
 
-    public static long hexadecimalToDecimal(String hexadecimal) { // hexadecimal to decimal
-        long decimal = 0; // שונה מ-int ל-long
-        int power = 0;
-        for (int i = hexadecimal.length() - 1; i >= 0; i--) {
-            char ch = hexadecimal.charAt(i);
-            int value;
-            if (ch >= '0' && ch <= '9') {
-                value = ch - '0';
-            } else {
-                value = ch - 'A' + 10;
-            }
-            // הוספנו המרה ל-long כדי שהתוצאה של Math.pow לא תיחתך
-            decimal += value * (long)Math.pow(16, power);
-            power++;
+    // המרה מהקסדצימלי לעשרוני - מבוסס משלים ל-2
+    public static long hexadecimalToDecimal(String hex) {
+        long decimal = 0;
+        for (int i = 0; i < hex.length(); i++) {
+            char ch = hex.charAt(i);
+            int value = (ch >= '0' && ch <= '9') ? (ch - '0') : (ch - 'A' + 10);
+
+            // הכפלה ב-16 והוספת הערך.
+            // אם הוזן מספר כמו FFFFFFFFFFFFFFFE, הגלישה בזיכרון תיצור -2 אוטומטית!
+            decimal = (decimal * 16) + value;
         }
         return decimal;
     }
 
-    // שינינו את סוג הפרמטר ל-long
-    public static String decimalToHexadecimal(long decimal) { // decimal to hexadecimal
-        if (decimal == 0) {
-            return "0";
+    // המרה מעשרוני להקסדצימלי - מבוסס משלים ל-2
+    public static String decimalToHexadecimal(long decimal) {
+        if (decimal == 0) return "0";
+
+        String hex = "";
+        long temp = decimal;
+
+        while (temp != 0) {
+            // פעולת AND על סיביות (Bitwise AND) לחילוץ 4 הביטים הימניים
+            int rem = (int)(temp & 15);
+
+            char hexDigit = (rem < 10) ? (char)(rem + '0') : (char)(rem - 10 + 'A');
+            hex = hexDigit + hex;
+
+            // הזזה ללא שמירת סימן (Unsigned Right Shift)
+            // זה מה שמאפשר לדחוף אפסים משמאל למספרים שליליים עד שהם מתאפסים
+            temp >>>= 4;
         }
-        String hexadecimal = "";
-        while (decimal > 0) {
-            // שינינו גם את השארית ל-long
-            long remainder = decimal % 16;
-            if (remainder < 10) {
-                hexadecimal = remainder + hexadecimal;
-            } else {
-                hexadecimal = (char)(remainder - 10 + 'A') + hexadecimal;
-            }
-            decimal = decimal / 16;
-        }
-        return hexadecimal;
+
+        return hex;
     }
 }
