@@ -9,7 +9,9 @@ def is_valid_decimal(s):
     # Handle optional negative sign
     if s[0] == "-":
         s = s[1:]
-    if s == "":
+   
+    # Ensure the string is not empty and does not start with a dot
+    if s == "" or s[0] == ".":
         return False
 
     dot_count = 0
@@ -32,7 +34,9 @@ def is_valid_hex(s):
     # Handle optional negative sign
     if s[0] == "-":
         s = s[1:]
-    if s == "":
+   
+    # Ensure the string is not empty and does not start with a dot
+    if s == "" or s[0] == ".":
         return False
 
     dot_count = 0
@@ -75,7 +79,7 @@ def decimal_to_hex(decimal_str):
         decimal_str = decimal_str[1:]
 
     parts = decimal_str.split(".")
-    int_part_str = parts[0] if parts[0] != "" else "0"
+    int_part_str = parts[0]
 
     # Convert integer part manually
     int_num = 0
@@ -136,7 +140,7 @@ def hex_to_decimal(hex_str):
         hex_str = hex_str[1:]
 
     parts = hex_str.split(".")
-    int_part_str = parts[0] if parts[0] != "" else "0"
+    int_part_str = parts[0]
 
     # Convert integer part manually
     int_num = 0
@@ -195,7 +199,6 @@ def calculator():
             print("Error: Please choose 1, 2, or 3 only.")
 
 
-# Run tests
+# Run calculator
 if __name__ == "__main__":
-    # run_tests()
     calculator()
