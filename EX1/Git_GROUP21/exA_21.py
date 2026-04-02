@@ -4,7 +4,7 @@ HEX_DIGITS = "0123456789ABCDEF"  # all the hex digits we need
 MAX_FRACTION_DIGITS = 8  # max digits after the decimal point in hex
 
 
-def convert_hex_to_decimal(number):
+def convert_decimal_to_hex(number):
     # input checks
     if not isinstance(number, (int, float)):
         raise ValueError("הקלט חייב להיות מספר")
@@ -42,7 +42,7 @@ def convert_hex_to_decimal(number):
     return hex_integer + "." + hex_fraction
 
 
-def convert_decimal_to_hex(decimal_string):
+def convert_hex_to_decimal(decimal_string):
     # input checks
     if not isinstance(decimal_string, str) or decimal_string == "":
         raise ValueError("הקלט חייב להיות מחרוזת לא ריקה")
@@ -103,14 +103,14 @@ def main():
                 print("שגיאה: קלט לא חוקי- יש להכניס מספר שלם או עשרוני")
                 continue
             try:
-                print(f"תוצאה: {convert_hex_to_decimal(number)}")
+                print(f"תוצאה: {convert_decimal_to_hex(number)}")
             except ValueError as e:
                 print(f"שגיאה: {e}")
 
         elif choice == "2":
             user_input = input("הכנס מספר הקסדצימלי: ").strip()
             try:
-                print(f"תוצאה: {convert_decimal_to_hex(user_input)}")
+                print(f"תוצאה: {convert_hex_to_decimal(user_input)}")
             except ValueError as e:
                 print(f"שגיאה: {e}")
 
