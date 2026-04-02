@@ -4,7 +4,7 @@ HEX_DIGITS = "0123456789ABCDEF"  # all the hex digits we need
 MAX_FRACTION_DIGITS = 8  # max digits after the decimal point in hex
 
 
-def decimal_to_hex(number):
+def convert_hex_to_decimal(number):
     # input checks
     if not isinstance(number, (int, float)):
         raise ValueError("הקלט חייב להיות מספר")
@@ -42,27 +42,28 @@ def decimal_to_hex(number):
     return hex_integer + "." + hex_fraction
 
 
-def hex_to_decimal(hex_string):
+def convert_decimal_to_hex(decimal_string):
     # input checks
-    if not isinstance(hex_string, str) or hex_string == "":
+    if not isinstance(decimal_string, str) or decimal_string == "":
         raise ValueError("הקלט חייב להיות מחרוזת לא ריקה")
 
-    hex_string = hex_string.upper()
+    decimal_string = decimal_string.upper()
 
     # make sure there's at most one dot
-    if hex_string.count(".") > 1:
+    if decimal_string.count(".") > 1:
         raise ValueError("קלט לא חוקי- יש להכניס מספר שלם או עשרוני")
 
     # split into integer and fractional parts
-    if "." in hex_string:
-        integer_str, fraction_str = hex_string.split(".")
+    if "." in decimal_string:
+        integer_str, fraction_str = decimal_string.split(".")
     else:
-        integer_str, fraction_str = hex_string, ""
+        integer_str, fraction_str = decimal_string, ""
 
     # check that every character is a valid hex digit
     for char in integer_str + fraction_str:
         if char not in HEX_DIGITS:
             raise ValueError(f"תו לא חוקי: '{char}'")
+
 
     # convert the integer part
     integer_result = 0
@@ -102,14 +103,14 @@ def main():
                 print("שגיאה: קלט לא חוקי- יש להכניס מספר שלם או עשרוני")
                 continue
             try:
-                print(f"תוצאה: {decimal_to_hex(number)}")
+                print(f"תוצאה: {convert_hex_to_decimal(number)}")
             except ValueError as e:
                 print(f"שגיאה: {e}")
 
         elif choice == "2":
             user_input = input("הכנס מספר הקסדצימלי: ").strip()
             try:
-                print(f"תוצאה: {hex_to_decimal(user_input)}")
+                print(f"תוצאה: {convert_decimal_to_hex(user_input)}")
             except ValueError as e:
                 print(f"שגיאה: {e}")
 
