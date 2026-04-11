@@ -24,10 +24,7 @@ How to run:
 How to run tests:
 1. Open terminal in the project folder
 2. Run:
-   python3 test_converter.py
-=======
+   python3 test_converter.
 # Automation_Course_2026B
 
-<img width="776" height="387" alt="Screenshot 2025-09-15 100250" src="https://github.com/user-attachments/assets/6999b841-c738-479c-8f35-c72e6deed468" />
-<img width="905" height="458" alt="Screenshot 2025-09-15 100802" src="https://github.com/user-attachments/assets/4d9b4e05-f2ff-4f17-89aa-d63e05112142" />
->>>>>>> c9f995e37508e8c526359cb0fb5978b52775ff04
+
