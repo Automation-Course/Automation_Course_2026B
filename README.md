@@ -1,3 +1,4 @@
+[README.md](https://github.com/user-attachments/files/26668827/README.md)
 # Automation_Course_2026B
 
 <img width="776" height="387" alt="Screenshot 2025-09-15 100250" src="https://github.com/user-attachments/assets/6999b841-c738-479c-8f35-c72e6deed468" />
