@@ -1,23 +1,13 @@
-#include <SPI.h>
-#include <MFRC522.h>
+#include <IRremote.h>
 #include <Servo.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <Adafruit_Fingerprint.h>
 #include <SoftwareSerial.h>
 
-// ---------- RFID - Moses Staff ----------
-#define RFID_SS_PIN 10
-#define RFID_RST_PIN 4
-
-MFRC522 rfid(RFID_SS_PIN, RFID_RST_PIN);
-
-// true = כל תג RFID מתקבל לבדיקה
-// false = רק UID ספציפי מתקבל
-bool TRUST_ANY_RFID = true;
-
-byte MOSES_UID[] = {0xDE, 0xAD, 0xBE, 0xEF};
-byte MOSES_UID_SIZE = 4;
+// ---------- IR Remote - Moses Approval ----------
+#define IR_PIN 11
+#define OK_BUTTON_CODE 0x1C
 
 // ---------- Fingerprint ----------
 #define FINGER_RX 3
@@ -41,13 +31,13 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 // ---------- Servo 360 ----------
 Servo redSeaServo;
 
-#define SERVO_STOP 90
+#define SERVO_STOP 89
 #define SERVO_OPEN 180
 #define SERVO_CLOSE 0
 
 // זמני פתיחה/סגירה
-const int OPEN_TIME = 600;
-const int CLOSE_TIME = 700;
+const int OPEN_TIME = 500;
+const int CLOSE_TIME = 500;
 
 // כמה זמן השער נשאר פתוח
 const unsigned long GATE_OPEN_DURATION = 5000;
@@ -57,17 +47,20 @@ const int DARK_THRESHOLD = 500;
 
 // ---------- System states ----------
 enum State {
-  WAIT_FOR_RFID,
+  WAIT_FOR_REMOTE,
   WAIT_FOR_FINGER,
   SEA_OPEN
 };
 
-State state = WAIT_FOR_RFID;
+State state = WAIT_FOR_REMOTE;
 
 unsigned long fingerStateStartTime = 0;
 const unsigned long FINGER_GRACE_TIME = 2000;
 
 unsigned long seaOpenStartTime = 0;
+
+unsigned long remoteStateStartTime = 0;
+const unsigned long REMOTE_GRACE_TIME = 700;
 
 // רק אחרי שהשער נסגר אוטומטית הכפתור פעיל
 bool buttonEnabledAfterAutoClose = false;
@@ -86,51 +79,59 @@ void setup() {
 
   redSeaServo.attach(SERVO_PIN);
   redSeaServo.write(SERVO_STOP);
+  delay(1000);
 
   lcd.init();
   lcd.backlight();
 
-  SPI.begin();
-  rfid.PCD_Init();
+  IrReceiver.begin(IR_PIN, ENABLE_LED_FEEDBACK);
 
   finger.begin(57600);
 
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("System Loading");
+  lcd.print(F("System Loading"));
   lcd.setCursor(0, 1);
-  lcd.print("Please wait");
+  lcd.print(F("Please wait"));
 
-  Serial.println("System loading...");
+  Serial.println(F("System loading..."));
 
   if (finger.verifyPassword()) {
-    Serial.println("Fingerprint sensor found!");
+    Serial.println(F("Fingerprint sensor found!"));
   } else {
-    Serial.println("Fingerprint sensor NOT found.");
+    Serial.println(F("Fingerprint sensor NOT found."));
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("Finger Error");
+    lcd.print(F("Finger Error"));
     lcd.setCursor(0, 1);
-    lcd.print("Check wiring");
+    lcd.print(F("Check wiring"));
     while (1);
   }
 
   delay(1500);
-  resetToRFID();
+  resetToRemote();
 }
 
 void loop() {
   checkLightSensor();
 
-  if (state == WAIT_FOR_RFID) {
-    checkRFID();
+  if (state == WAIT_FOR_REMOTE) {
+    checkRemote();
   }
 
   else if (state == WAIT_FOR_FINGER) {
     // הכפתור פעיל רק אחרי שהשער נסגר אוטומטית
     if (buttonEnabledAfterAutoClose && digitalRead(CLOSE_BUTTON) == LOW) {
-      resetToRFIDByButton();
-      return;
+      delay(80);
+
+      if (digitalRead(CLOSE_BUTTON) == LOW) {
+        while (digitalRead(CLOSE_BUTTON) == LOW) {
+          delay(10);
+        }
+
+        resetToRemoteByButton();
+        return;
+      }
     }
 
     checkFingerprintBeforeOpen();
@@ -152,9 +153,6 @@ void loop() {
 void checkLightSensor() {
   int lightValue = analogRead(LDR_PIN);
 
-  Serial.print("Light value: ");
-  Serial.println(lightValue);
-
   // עמוד האש נדלק כשחושך
   if (lightValue > DARK_THRESHOLD) {
     digitalWrite(LED_YELLOW, HIGH);
@@ -163,82 +161,48 @@ void checkLightSensor() {
   }
 }
 
-// ---------- RFID - Moses Staff ----------
+// ---------- IR Remote - Moses Approval ----------
 
-void checkRFID() {
-  if (!rfid.PICC_IsNewCardPresent()) {
+void checkRemote() {
+  if (millis() - remoteStateStartTime < REMOTE_GRACE_TIME) {
+    if (IrReceiver.decode()) {
+      IrReceiver.resume();
+    }
     return;
   }
 
-  if (!rfid.PICC_ReadCardSerial()) {
-    return;
-  }
+  if (IrReceiver.decode()) {
+    byte command = IrReceiver.decodedIRData.command;
 
-  Serial.print("RFID UID: ");
-  printUID();
+    Serial.print(F("Button code: 0x"));
+    Serial.println(command, HEX);
 
-  bool validRFID = TRUST_ANY_RFID || isMosesUID();
-
-  rfid.PICC_HaltA();
-  rfid.PCD_StopCrypto1();
-
-  if (validRFID) {
-    digitalWrite(LED_RED, LOW);
-    digitalWrite(LED_GREEN, LOW);
-
-    buttonEnabledAfterAutoClose = false;
-
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Hello Moses");
-    lcd.setCursor(0, 1);
-    lcd.print("Staff approved");
-
-    Serial.println("Moses staff approved");
-
-    delay(1500);
-
-    prepareFingerScan();
-  } else {
-    denyRFID();
-  }
-}
-
-bool isMosesUID() {
-  if (rfid.uid.size != MOSES_UID_SIZE) {
-    return false;
-  }
-
-  for (byte i = 0; i < rfid.uid.size; i++) {
-    if (rfid.uid.uidByte[i] != MOSES_UID[i]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-void printUID() {
-  for (byte i = 0; i < rfid.uid.size; i++) {
-    Serial.print("0x");
-
-    if (rfid.uid.uidByte[i] < 0x10) {
-      Serial.print("0");
+    if (IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT) {
+      IrReceiver.resume();
+      return;
     }
 
-    Serial.print(rfid.uid.uidByte[i], HEX);
+    IrReceiver.resume();
 
-    if (i < rfid.uid.size - 1) {
-      Serial.print(", ");
+    if (command == OK_BUTTON_CODE) {
+      digitalWrite(LED_RED, LOW);
+      digitalWrite(LED_GREEN, LOW);
+
+      buttonEnabledAfterAutoClose = false;
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print(F("Moses approved"));
+      lcd.setCursor(0, 1);
+      lcd.print(F("Staff approved"));
+
+      Serial.println(F("Moses approved"));
+
+      delay(1500);
+
+      prepareFingerScan();
     }
   }
-
-  Serial.println();
-}
-
-void resetRFIDReader() {
-  rfid.PCD_Init();
-  delay(200);
 }
 
 // ---------- Fingerprint ----------
@@ -246,11 +210,11 @@ void resetRFIDReader() {
 void prepareFingerScan() {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Scan Finger");
+  lcd.print(F("Scan Finger"));
   lcd.setCursor(0, 1);
-  lcd.print("Place finger");
+  lcd.print(F("Place finger"));
 
-  Serial.println("Waiting for fingerprint...");
+  Serial.println(F("Waiting for fingerprint..."));
 
   digitalWrite(LED_RED, LOW);
   digitalWrite(LED_GREEN, LOW);
@@ -265,9 +229,9 @@ void checkFingerprintBeforeOpen() {
   }
 
   lcd.setCursor(0, 0);
-  lcd.print("Scan Finger     ");
+  lcd.print(F("Scan Finger     "));
   lcd.setCursor(0, 1);
-  lcd.print("Place finger    ");
+  lcd.print(F("Place finger    "));
 
   int fingerID = getFingerprintID();
 
@@ -283,11 +247,11 @@ void checkFingerprintBeforeOpen() {
 
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("Welcome to");
+    lcd.print(F("Welcome to"));
     lcd.setCursor(0, 1);
-    lcd.print("Canaan!");
+    lcd.print(F("Canaan!"));
 
-    Serial.print("Fingerprint approved. ID: ");
+    Serial.print(F("Fingerprint approved. ID: "));
     Serial.println(fingerID);
 
     delay(1500);
@@ -339,11 +303,11 @@ void denyFingerprintBeforeOpen() {
 
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Access Denied");
+  lcd.print(F("Access Denied"));
   lcd.setCursor(0, 1);
-  lcd.print("Try again");
+  lcd.print(F("Try again"));
 
-  Serial.println("Access denied: Finger denied");
+  Serial.println(F("Access denied: Finger denied"));
 
   delay(3000);
 
@@ -351,27 +315,6 @@ void denyFingerprintBeforeOpen() {
 
   // אחרי טביעה לא נכונה נשארים בשלב האצבע
   prepareFingerScan();
-}
-
-void denyRFID() {
-  digitalWrite(LED_RED, HIGH);
-  digitalWrite(LED_GREEN, LOW);
-
-  redSeaServo.write(SERVO_STOP);
-
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Wrong Staff");
-  lcd.setCursor(0, 1);
-  lcd.print("Access Denied");
-
-  Serial.println("Access denied: Wrong staff");
-
-  delay(3000);
-
-  digitalWrite(LED_RED, LOW);
-
-  resetToRFID();
 }
 
 // ---------- Red Sea ----------
@@ -387,11 +330,11 @@ void openRedSea() {
 
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Gate Open");
+  lcd.print(F("Gate Open"));
   lcd.setCursor(0, 1);
-  lcd.print("5 sec...");
+  lcd.print(F("5 sec..."));
 
-  Serial.println("Access granted - Red Sea opened");
+  Serial.println(F("Access granted - Red Sea opened"));
 
   seaOpenStartTime = millis();
   state = SEA_OPEN;
@@ -408,15 +351,14 @@ void autoCloseSea() {
 
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Gate Closed");
+  lcd.print(F("Gate Closed"));
   lcd.setCursor(0, 1);
-  lcd.print("Scan finger");
+  lcd.print(F("Scan finger"));
 
-  Serial.println("Gate auto closed - scan next finger");
+  Serial.println(F("Gate auto closed - scan next finger"));
 
   delay(1500);
 
-  // עכשיו הכפתור פעיל, ורק עכשיו לחיצה תחזיר ל-RFID
   buttonEnabledAfterAutoClose = true;
 
   prepareFingerScan();
@@ -424,7 +366,7 @@ void autoCloseSea() {
 
 // ---------- Reset by button ----------
 
-void resetToRFIDByButton() {
+void resetToRemoteByButton() {
   redSeaServo.write(SERVO_STOP);
 
   digitalWrite(LED_GREEN, LOW);
@@ -432,20 +374,20 @@ void resetToRFIDByButton() {
 
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Reset by Moses");
+  lcd.print(F("Reset by Moses"));
   lcd.setCursor(0, 1);
-  lcd.print("Scan staff");
+  lcd.print(F("Press OK"));
 
-  Serial.println("Button pressed after gate closed - reset to RFID step");
+  Serial.println(F("Button pressed after gate closed - reset to remote step"));
 
   delay(1500);
 
-  resetToRFID();
+  resetToRemote();
 }
 
 // ---------- Reset ----------
 
-void resetToRFID() {
+void resetToRemote() {
   digitalWrite(LED_RED, LOW);
   digitalWrite(LED_GREEN, LOW);
 
@@ -453,15 +395,19 @@ void resetToRFID() {
 
   redSeaServo.write(SERVO_STOP);
 
-  resetRFIDReader();
-
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Scan Moses");
+  lcd.print(F("Moses approve?"));
   lcd.setCursor(0, 1);
-  lcd.print("Staff");
+  lcd.print(F("Press OK"));
 
-  Serial.println("System reset - Scan Moses Staff");
+  Serial.println(F("System reset - Wait for OK"));
 
-  state = WAIT_FOR_RFID;
+  remoteStateStartTime = millis();
+
+  if (IrReceiver.decode()) {
+    IrReceiver.resume();
+  }
+
+  state = WAIT_FOR_REMOTE;
 }
